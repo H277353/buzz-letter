@@ -1,0 +1,94 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+
+model User {
+  id             String           @id @default(uuid())
+  username       String           @unique
+  email          String           @unique
+  password       String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  
+  posts          Post[]
+
+  likedPosts          Like[]   @relation("UserLikedPosts")
+  // Users this user subscribes to
+  subscriptions  Subscription[]   @relation("UserAsSubscriber")
+
+  // Users who subscribe to this user
+  subscribers    Subscription[]   @relation("UserAsCreator")
+
+  // Optional cached counters (useful for UI)
+  subscriberCount Int @default(0)
+  postCount       Int @default(0)
+}
+
+model Subscription {
+  id            String   @id @default(uuid())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Subscriber (the follower)
+  subscriber    User     @relation("UserAsSubscriber", fields: [subscriberId], references: [id])
+  subscriberId  String
+
+  // Creator (the one being followed)
+  creator       User     @relation("UserAsCreator", fields: [creatorId], references: [id])
+  creatorId     String
+
+  @@unique([subscriberId, creatorId])
+}
+
+model Post {
+  id          String      @id @default(uuid())
+  title       String
+  content     String
+  status      PostStatus  @default(DRAFT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  slug        String      @unique
+  
+
+  author      User        @relation(fields: [authorId], references: [id])
+  authorId    String
+
+  likedByUsers         Like[]   @relation("PostLikedByUsers")
+   // Cached count for fast reads (optional)
+  likesCount Int @default(0)
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  // who liked it
+  user      User     @relation("UserLikedPosts", fields: [userId], references: [id])
+  userId    String
+
+  // which post they liked
+  post      Post     @relation("PostLikedByUsers", fields: [postId], references: [id])
+  postId    String
+
+  @@unique([userId, postId]) // prevent duplicate likes
+}
+
